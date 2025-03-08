@@ -191,7 +191,7 @@ def get_drder_one(Er, A,mx,sigma, frac=0,spin='SI'):
     rate_1my = rate*(1e6*365*24*60*60) # rate per 1 Myr per kg per keV
     #rate_1gy_10mg = rate_1my*1000*(10e-3/1e3)
 
-    return rate_1my
+    return Er, rate_1my
 
 def get_drder(Er, A, atomic_fraction,mx,sigma,frac=0,spin='SI'):
     Num_types = 1
