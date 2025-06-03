@@ -18,6 +18,7 @@ Er_avail_array = [0.01,0.03,0.05,0.07,0.1, 0.2, 0.3, 0.4, 0.5, \
                            5, 8, 10, 15, 18, 23, 25, 30, 33, 38, 40]
 
 spin_array = [5/2, 1/2, 1/2, 5/2]
+spin_isotopic_fractions_array = [0.00048, 0.0467, 0.021, 0.1] # isotopic abundance for the nuclear spin listed in spin_array
 
 alpha = [[-0.09428571428571428, 2.514102564102564, -10.5], \
          [-0.0639795918367347, 2.596153846153846, -10.5], \
@@ -45,11 +46,10 @@ olivineObj.set_raw_data_paths(raw_data_path_array)
 olivineObj.set_derived_data_paths(derived_data_path_array)
 olivineObj.set_Er_avail(Er_avail_array)
 olivineObj.set_nuclear_spins(spin_array)
+olivineObj.set_spin_isotopic_fractions(spin_isotopic_fractions_array)
 olivineObj.set_alpha_params(alpha)
 olivineObj.set_mean_params(mean)
 olivineObj.set_var_params(var)
-
-
 
 
 print(olivineObj.name)

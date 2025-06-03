@@ -47,6 +47,13 @@ class Minerals:
             return
         else:   
             self.nuclear_spin = spin_array
+
+    def set_spin_isotopic_fractions(self, spin_isotopic_fractions_array):
+        if self.number_of_elements != len(spin_isotopic_fractions_array):
+            print('the number of fractions you enter does not match with the number of elements')
+            return
+        else:   
+            self.spin_isotopic_fractions = spin_isotopic_fractions_array
     
     
 
