@@ -157,9 +157,16 @@ def get_Neutrino_dRdx_mol(xt_range, mineral, flux_table,mscalar=None, g_vs=None,
         Z = mineral.atomic_number[i]
         Sn = mineral.nuclear_spin[i]
         fraction = mineral.atomic_fractions[i]
+        spin_fraction  = mineral.spin_isotopic_fractions[i]
         
-        dRdx_neutrino += get_Neutrino_dRdx_one(xt_range, data_path, A, Z, Sn, flux_table,\
-            mscalar=mscalar, g_vs=g_vs, mvector=mvector, g_vz=g_vz, mpseuvec=mpseuvec, g_va=g_va, kappa=kappa)*fraction
+        if mpseuvec == None:
+            dRdx_neutrino += get_Neutrino_dRdx_one(xt_range, data_path, A, Z, Sn, flux_table,\
+                mscalar=mscalar, g_vs=g_vs, mvector=mvector, g_vz=g_vz, mpseuvec=mpseuvec, g_va=g_va, kappa=kappa)*fraction
+        else:
+            dRdx_sm = get_Neutrino_dRdx_one(xt_range, data_path, A, Z, Sn, flux_table)
+            dRdx_bsm = (get_Neutrino_dRdx_one(xt_range, data_path, A, Z, Sn, flux_table,\
+                mscalar=mscalar, g_vs=g_vs, mvector=mvector, g_vz=g_vz, mpseuvec=mpseuvec, g_va=g_va, kappa=kappa) - dRdx_sm )* spin_fraction
+            dRdx_neutrino += (dRdx_sm + dRdx_bsm) * fraction
 
     return dRdx_neutrino
 
@@ -215,9 +222,14 @@ def get_BSM_Neutrino_dRdx_corr_mol(xt_range, mineral, flux_table, extra_term, ms
         Z = mineral.atomic_number[i]
         S = mineral.nuclear_spin[i]
         fraction = mineral.atomic_fractions[i]
+        spin_fraction = mineral.spin_isotopic_fractions[i]
         
-        dRdx_bsm_neutrino += get_BSM_Neutrino_dRdx_corr_one(xt_range, data_path, A, Z, S,flux_table, extra_term=extra_term, \
-                    mscalar=mscalar, g_vs=g_vs, mvector=mvector, g_vz=g_vz, mpseuvec=mpseuvec, g_va=g_va, kappa=kappa)*fraction
+        if mpseuvec == None:
+            dRdx_bsm_neutrino += get_BSM_Neutrino_dRdx_corr_one(xt_range, data_path, A, Z, S,flux_table, extra_term=extra_term, \
+                        mscalar=mscalar, g_vs=g_vs, mvector=mvector, g_vz=g_vz, mpseuvec=mpseuvec, g_va=g_va, kappa=kappa)*fraction
+        else:
+            dRdx_bsm_neutrino += get_BSM_Neutrino_dRdx_corr_one(xt_range, data_path, A, Z, S,flux_table, extra_term=extra_term, \
+                        mscalar=mscalar, g_vs=g_vs, mvector=mvector, g_vz=g_vz, mpseuvec=mpseuvec, g_va=g_va, kappa=kappa)*fraction*spin_fraction
 
     return dRdx_bsm_neutrino
 
@@ -248,45 +260,67 @@ def get_binned_track_spec_method1(drdx, x, binwidth=1, integration_res=500):
     R = np.moveaxis(R,0,-1)
     return (R, x)
 
-def get_binned_track_spec(drdx, x,resolution=15, number_of_bins=100):
+def get_binned_track_spec(drdx, x,resolution=15, number_of_bins=100, window=True, logspace=False):
     # drdx is numerical, so there's only a finite number of points, so first interpolate drdx first then pick the values at bin edges
     # track lengths are always in the _=last axis, rearrange all extra axis to the front
-    
-    bin_edges = np.logspace(np.log10(resolution/2), 3, number_of_bins+1)
+    if logspace==True:
+        bin_edges = np.logspace(np.log10(resolution/2), 3, number_of_bins+1)
+    else:
+        bin_edges = np.linspace(resolution/2, 1000, number_of_bins+1)
+
     interp_region = np.logspace(np.log10(resolution/2), 3, 700)
+
     # drdx_interp = np.exp(np.interp(np.log(interp_region), np.log(x), np.log(drdx), left=0, right=0))
     drdx_interp = np.interp(interp_region, x, drdx)
     binned_rate =[]
-    for i in range(number_of_bins):
-        window = window_function(interp_region, bin_edges[i], bin_edges[i+1], resolution)
-        integrand = drdx_interp*window
-        integral = np.trapz(integrand, interp_region, axis=-1)
-        binned_rate.append(integral)
+    if window == True:
+        for i in range(number_of_bins):
+            # convolved_rate = window_function(interp_region, bin_edges[i], bin_edges[i+1], resolution)
+            convolved_rate = window_function(interp_region, bin_edges[i], bin_edges[i+1], resolution)
+            integrand = drdx_interp*convolved_rate
+            integral = np.trapz(integrand, interp_region, axis=-1)
+            binned_rate.append(integral)
+    else:
+        for i in range(number_of_bins):
+            int_range = np.logspace(np.log10(bin_edges[i]), np.log10(bin_edges[i+1]), 100)
+            integrand = np.interp(int_range, interp_region, drdx_interp, left=0, right=0)
+            integral = np.trapz(integrand, int_range)
+            binned_rate.append(integral)
         
     binned_rate = np.array(binned_rate)
     binned_rate = np.moveaxis(binned_rate,0,-1)
     return (binned_rate, bin_edges)
 
-def get_wimps_Nbins(sigma, xt_range, mx, mineral, resolution=15, number_of_bins=100, frac=0, spin='SI'):
+def get_wimps_Nbins(sigma, xt_range, mx, mineral, resolution=15, number_of_bins=100, frac=0, spin='SI', window=True):
 
     dRdx = get_wimps_dRdx(mx, sigma, xt_range, mineral, frac=frac, spin=spin)[0]
     # rate, bin_edges = get_binned_track_spec(dRdx, xt_range, binwidth=binwidth, integration_res=integration_res)
-    rate, bin_edges = get_binned_track_spec(dRdx, xt_range, resolution=resolution, number_of_bins=number_of_bins)
+    rate, bin_edges = get_binned_track_spec(dRdx, xt_range, resolution=resolution, number_of_bins=number_of_bins, window=window)
     return rate, bin_edges
-def get_neutron_Nbins(C, xt_range, mineral, resolution=15, number_of_bins=100):
+def get_neutron_Nbins(C, xt_range, mineral, resolution=15, number_of_bins=100, window=True):
     
     dRdx = get_neutron_dRdx_mol(xt_range, mineral, C)[0]
     # rate, bin_edges = get_binned_track_spec(dRdx, xt_range, binwidth=binwidth, integration_res=integration_res)
-    rate, bin_edges = get_binned_track_spec(dRdx, xt_range, resolution=resolution, number_of_bins=number_of_bins)
+    rate, bin_edges = get_binned_track_spec(dRdx, xt_range, resolution=resolution, number_of_bins=number_of_bins, window=window)
 
     return rate, bin_edges
 
-def get_neutrino_Nbins(xt_range, mineral, flux_table, mscalar=None, g_vs=None, mvector=None, g_vz=None, mpseuvec=None, g_va=None, resolution=15, number_of_bins=100, kappa=1):
+def get_Th_Nbins(C, xt_range, resolution=15, number_of_bins=100, window=True):
+
+    data = np.load('/Users/szechingaudreyfung/PaleoBSMwithTRIM/SRIM_derived_data/Backgrounds/Th/Tables/dist_at_72keV_01ppb.npy')
+    dRdx_table = data *(C/1e-10)
+    
+    dRdx = np.interp(xt_range, np.logspace(-2,3,500), dRdx_table)
+
+    rate, bin_edges = get_binned_track_spec(dRdx, xt_range, resolution=resolution, number_of_bins=number_of_bins, window=window)
+    return rate, bin_edges
+
+def get_neutrino_Nbins(xt_range, mineral, flux_table, mscalar=None, g_vs=None, mvector=None, g_vz=None, mpseuvec=None, g_va=None, resolution=15, number_of_bins=100, kappa=1, window=True):
 
     dRdx = get_Neutrino_dRdx_mol(xt_range, mineral, flux_table, \
             mscalar=mscalar, g_vs=g_vs, mvector=mvector, g_vz=g_vz, mpseuvec=mpseuvec, g_va=g_va, kappa=kappa)
     # rate, bin_edges = get_binned_track_spec(dRdx, xt_range, binwidth=binwidth, integration_res=integration_res)
-    rate, bin_edges = get_binned_track_spec(dRdx, xt_range, resolution=resolution, number_of_bins=number_of_bins)
+    rate, bin_edges = get_binned_track_spec(dRdx, xt_range, resolution=resolution, number_of_bins=number_of_bins, window=window)
 
     return rate, bin_edges
 
@@ -309,25 +343,7 @@ def get_BSM_neutrino_Nbins_corr(xt_range, mineral, flux_table, extra_term, mscal
 
     return rate, bin_edges
 
-def get_N_all_cntrl_array(sigma, mx, xt_range, mineral,mineral_mass=1, t_age=1 ,C_cntrl=1e-10, resolution=15, number_of_bins=100, window=True):
-    
-    N_wimps_ctrl = get_wimps_Nbins(sigma, xt_range, mx, mineral,resolution=resolution, number_of_bins=number_of_bins)[0]
-    N_neutron_ctrl = get_neutron_Nbins(C_cntrl, xt_range, mineral,resolution=resolution, number_of_bins=number_of_bins)[0]
-
-    N_all_cntrl = [N_wimps_ctrl]
-    N_solar_neutrino_cntrl = 0
-    for i, source in enumerate(sources[:-3]):
-        flux_i = np.load(neutrino_data_path + f'extrapolate_{source}_fluxes.npy')
-        N_solar_neutrino_cntrl += get_neutrino_Nbins(xt_range, mineral, flux_i, resolution=resolution, number_of_bins=number_of_bins)[0]
-        
-    N_all_cntrl.append(N_solar_neutrino_cntrl)
-    for i, source in enumerate(sources[-3:]):
-        flux_i = np.load(neutrino_data_path + f'extrapolate_{source}_fluxes.npy')
-        N_neutrino = get_neutrino_Nbins(xt_range, mineral, flux_i, resolution=resolution, number_of_bins=number_of_bins)[0]
-        N_all_cntrl.append(N_neutrino)
-    
-    N_all_cntrl.append(N_neutron_ctrl)
-    N_all_cntrl = np.array(N_all_cntrl)*mineral_mass*t_age
+# , window=True_all_cntrl)*mineral_mass*t_age
     return N_all_cntrl
 
 
@@ -410,6 +426,15 @@ def get_neutron_spOnly_dRdx_mol(xt_range, mineral, C):
         dRdx_neutron += get_neutron_spOnly_dRdx_one(xt_range, data_path, composition, molecule_mass,C)*fraction
     return dRdx_neutron
 
+def get_Th_spOnly_dRdx_mol(x, C, center=26.135851995198294, epsilon=1e-6):
+    # There is no dRdx_one for Thorium as simulations are for the entire olivine
+    absdiff = abs(x-center)
+    min_idx = np.where(absdiff == absdiff.min())[0][0]
+    new_center = x[min_idx]
+    normalisation = 10**7 * C/1e-10
+    func = np.exp(-((x - new_center) ** 2) / (2 * epsilon**2)) / (np.sqrt(2 * np.pi) * epsilon)
+    return func/np.trapz(func, x) * normalisation
+
 def get_SM_Neutrino_spOnly_dRdx_one(xt_range, composition, A, Z, flux_table):
     
     Sn = 0 #for SM bkg
@@ -448,6 +473,14 @@ def get_wimps_spOnly_Nbins(sigma, xt_range, mx, mineral, resolution=15, number_o
 def get_neutron_spOnly_Nbins(C, xt_range, mineral, resolution=15, number_of_bins=100):
     
     dRdx = get_neutron_spOnly_dRdx_mol(xt_range, mineral, C)[0]
+    # rate, bin_edges = get_binned_track_spec(dRdx, xt_range, binwidth=binwidth, integration_res=integration_res)
+    rate, bin_edges = get_binned_track_spec(dRdx, xt_range, resolution=resolution, number_of_bins=number_of_bins)
+
+    return rate, bin_edges
+
+def get_Th_spOnly_Nbins(C, xt_range, resolution=15, number_of_bins=100):
+    
+    dRdx = get_Th_spOnly_dRdx_mol(xt_range, C)
     # rate, bin_edges = get_binned_track_spec(dRdx, xt_range, binwidth=binwidth, integration_res=integration_res)
     rate, bin_edges = get_binned_track_spec(dRdx, xt_range, resolution=resolution, number_of_bins=number_of_bins)
 

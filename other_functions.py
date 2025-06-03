@@ -38,14 +38,14 @@ def logL_nD(x, xerr, N_central, N_data):
     # N_central = array of central values of all the track lengths components
     # N_data = the total counts, summed over all components
     # x = [solar neutrino, DSNB, GSNB, ATM, neutron, t_age, mineral_mass]
-    # N_central = [DM, solar_nu, DSNB, GSNB, ATM, neutron] # not considering: , Th234, single_alpha]
+    # N_central = [DM, solar_nu, DSNB, GSNB, ATM, neutron, Th234] # not considering: , Th234, single_alpha]
     # x = np.array(x[:,np.newaxis])
     N_DM = N_central[0]
     N_solar_nu = x[0]*N_central[1]
     N_DSNB = x[1]*N_central[2]
     N_GSNB = x[2]*N_central[3]
     N_ATM= x[3]*N_central[4]
-    N_neutron = x[4]*N_central[5]
+    N_neutron = x[4]*(N_central[5] + N_central[6]) # neutron and Th234 share the same uncertainty
     # N_Th234 = x[4]*N_central[6]
     # N_alpha = x[4]*N_central[7]
     N_tb_tested = (N_DM + N_solar_nu + N_DSNB + N_GSNB + N_ATM + N_neutron)*x[-1]*x[-2]

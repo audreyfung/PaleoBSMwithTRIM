@@ -125,21 +125,23 @@ if False:
     print(f'DM shape: {dRdx_dm.shape}')
 
 # light mediators neutrino dRdx with srim
-if False:
+if True:
     xt_range = np.logspace(-2,3,500)
     mineral=olivineObj
     neutrino_data_path = '/Users/szechingaudreyfung/PaleoBSMwithTRIM/neutrino_fluxes/'
     solar_sources = ['solar_pp', 'solar_B', 'solar_F', 'solar_Be862', 'solar_Be384', 'solar_N13', \
                'solar_O15', 'solar_pep', 'solar_hep'] # only solar sources are included
     
-    mpseuvec = 1 # GeV
-    g_va = 1e-2
-
+    # mpseuvec = 1# GeV
+    # g_va = 5e-2
+    # mscalar = 1
+    # g_vs = 1e-3
+    print(olivineObj.spin_isotopic_fractions)
     dRdx = 0
     for i, source in enumerate(solar_sources):
         flux_i = np.load(neutrino_data_path + f'extrapolate_{source}_fluxes.npy')
-        dRdx += get_Neutrino_dRdx_mol(xt_range, mineral, flux_i, mpseuvec=mpseuvec, g_va=g_va)
-    np.save('/Users/szechingaudreyfung/paleo/saved_results/drdx_mediators_axialVec_1GeV_1e-2', dRdx)
+        dRdx += get_Neutrino_dRdx_mol(xt_range, mineral, flux_i)
+        np.save('/Users/szechingaudreyfung/paleo/saved_results/drdx_solar_nu_', dRdx)
 
 
 # binned tracks
@@ -166,12 +168,12 @@ if False:
     #     num_frac = olivineObj.number_fractions[i]
 
     #     dRdx_neutron += get_neutron_dRdx_one(xt_range, data_path, 153.31,1e-10)
-    dRdx_neutron = get_neutron_dRdx_mol(xt_range, olivineObj,5e-10)
+    dRdx_neutron = get_neutron_dRdx_mol(xt_range, olivineObj,1e-10)
     
-    np.save('/Users/szechingaudreyfung/Desktop/Dark Interactions/arrays_to_plot/drdx_bkg_neutron_05ppb', dRdx_neutron)
+    np.save('/Users/szechingaudreyfung/paleo/saved_results/drdx_bkg_neutron_01ppb', dRdx_neutron)
 
 # neutrino dRdx with srim
-if True:
+if False:
     xt_range = np.logspace(-2,3,500)
     mineral=olivineObj
     neutrino_data_path = '/Users/szechingaudreyfung/PaleoBSMwithTRIM/neutrino_fluxes/'
@@ -186,20 +188,20 @@ if True:
 
 
 # test with Stopping power
-if True:
+if False:
     xt_range = np.logspace(-2,3,500)
     SP_files = ['OOli_SRIM.txt', 'SiOli_SRIM.txt', 'FeOli_SRIM.txt', 'MgOli_SRIM.txt']
     baum_fraction = np.array([0.41743753, 0.18319438, 0.14570679, 0.2536613 ])
     neutrino_data_path = '/Users/szechingaudreyfung/PaleoBSMwithTRIM/neutrino_fluxes/'
     sources = ['solar_pp', 'solar_B', 'solar_F', 'solar_Be862', 'solar_Be384', 'solar_N13', \
-               'solar_O15', 'solar_pep', 'solar_hep', 'DSNB','ATM', 'GSNB']
-    # sources = ['DSNB']
+               'solar_O15', 'solar_pep', 'solar_hep']
+    # sources = ['DSNB','ATM', 'GSNB']
     if False:
         mx = 100
         sigma  = np.array([1e-43])
-    if False:
-        mpseuvec = 1e-6 # GeV
-        g_va = 1e-2
+    if True:
+        mpseuvec = 1e-2 # GeV
+        g_va = 1e-4
 
     # dRdx_sp = 0
     # dRdx_sp_neutron = 0
@@ -212,17 +214,18 @@ if True:
         A = olivineObj.atomic_masses[i]
         Z = olivineObj.atomic_number[i]
         Sn = olivineObj.nuclear_spin[i]
+        spin_fraction = olivineObj.spin_isotopic_fractions[i]
         Erange = np.logspace(-3,3, 700)
 
         # neutrino
         if True:
             dRdE_neutrino = 0
-            for source in sources[-1:]:
+            for source in sources:
                 flux_j = np.load(neutrino_data_path + f'extrapolate_{source}_fluxes.npy')
-                dRdE_neutrino += get_dRdE_nu(Erange, A, Z, Sn, flux_j)
+                dRdE_neutrino += get_dRdE_nu(Erange, A, Z, Sn, flux_j, mpseuvec=mpseuvec, g_va=g_va)
         # neutron
         if False:
-            C = 5e-10
+            C = 1e-10
             dRdE_neutron_load = np.load(data_path+'Tables/neutron_recoil.npy')
         # DM
         if False:
@@ -240,14 +243,14 @@ if True:
         # dRdE_DM.append(dRdE)
 
         # dRdx_sp_neutron += dRdE_interp_neutron * dEdx_interp * fraction
-        dRdx_sp_neutrino += dRdE_interp_neutrino * dEdx_interp * fraction
+        dRdx_sp_neutrino += dRdE_interp_neutrino * dEdx_interp * fraction * spin_fraction
         # dRdx_sp += dRdE_interp * dEdx_interp * fraction
     # dRdE_DM = np.array(dRdE_DM)
 
     # np.save(f'/Users/szechingaudreyfung/Desktop/Dark Interactions/arrays_to_plot/drdE_olivine_{mx}GeV_1e-45', dRdE_DM)
     # np.save(f'/Users/szechingaudreyfung/Desktop/Dark Interactions/arrays_to_plot/drdx_olivine_{mx}GeV_5e-47_sp', dRdx_sp)
-    # np.save(f'/Users/szechingaudreyfung/Desktop/Dark Interactions/arrays_to_plot//drdx_bkg_neutron_05ppb_sp', dRdx_sp_neutron)
-    np.save(f'/Users/szechingaudreyfung/paleo/saved_results/drdx_neutrino_SM_GSNB_sp', dRdx_sp_neutrino)
-    # np.save('/Users/szechingaudreyfung/paleo/saved_results/drdx_mediators_axialVec_1keV_1e-2_sp', dRdx_sp_neutrino)
+    # np.save(f'/Users/szechingaudreyfung/paleo/saved_results/drdx_bkg_neutron_01ppb_sp', dRdx_sp_neutron)
+    # np.save(f'/Users/szechingaudreyfung/paleo/saved_results/drdx_neutrino_SM_GSNB_sp', dRdx_sp_neutrino)
+    np.save('/Users/szechingaudreyfung/paleo/saved_results/drdx_mediators_axialVec_1keV_1e-4_sp', dRdx_sp_neutrino)
     # print(f'SP shape: {dRdx_sp.shape}')
 
